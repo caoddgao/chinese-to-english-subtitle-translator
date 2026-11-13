@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="color-scheme" content="dark" />
+  <title>字幕翻译</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+
+    <!-- 左侧栏:品牌 + 新建 + 历史 -->
+    <aside class="sidebar">
+      <div class="brand">
+        <div class="logo">字</div>
+        <div class="brand-text">字幕翻译</div>
+      </div>
+
+      <button class="new-chat" id="new-chat-btn">
+        <span>+</span>&nbsp;新建对话
+      </button>
+
+      <div class="hist-label">历史对话</div>
+      <ul class="hist-list" id="hist-list"></ul>
+
+      <div class="sidebar-footer">
+        <button class="ghost-icon" id="open-refs" title="资料库">📚 资料库</button>
+        <button class="ghost-icon" id="open-settings" title="设置">⚙ 设置</button>
+      </div>
+    </aside>
+
+    <!-- 主区域 -->
+    <main class="main">
+      <header class="topbar">
+        <div class="conv-title-wrap">
+          <input id="conv-title" class="conv-title" placeholder="新对话" />
+        </div>
+        <div class="topbar-tools">
+          <select id="prompt-select" title="切换系统指令 (并设为默认)"></select>
+          <select id="model-select" title="选择模型"></select>
+        </div>
+      </header>
+
+      <section class="chat" id="chat">
+        <div class="empty-state" id="empty-state">
+          <h1>开始一段翻译</h1>
+          <p>上传中文 SRT 出英文初稿,或粘贴想精修的句子讨论译法。</p>
+          <p class="mini">所有对话与翻译结果都会保留在历史里,可改名、可删除。</p>
+        </div>
+        <div class="chat-log" id="chat-log"></div>
+      </section>
+
+      <footer class="composer">
+        <div class="composer-attachments" id="composer-attachments"></div>
+        <div class="composer-box">
+          <textarea id="composer-input" rows="2"
+            placeholder="发消息讨论译法，或点左下角上传 SRT 翻译整集 (Ctrl+Enter 发送)"></textarea>
+          <div class="composer-toolbar">
+            <label class="tool-btn" title="上传 .srt 字幕、.txt 文本或图片">
+              <input type="file" id="attach-upload"
+                     accept=".srt,.txt,image/*" multiple hidden />
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                   stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48"/>
+              </svg>
+              <span>附件</span>
+            </label>
+            <span class="merge-toggle" title="翻译 SRT 时，把碎短句合并送模型（提高翻译质量）">
+              <input type="checkbox" id="merge-toggle" checked />
+              <label for="merge-toggle">合并碎句</label>
+            </span>
+            <span class="spacer"></span>
+            <button id="send-btn">发送</button>
+          </div>
+        </div>
+      </footer>
+    </main>
+
+    <!-- 抽屉:资料库 -->
+    <div class="drawer" id="refs-drawer" hidden>
+      <div class="drawer-mask" data-close="refs-drawer"></div>
+      <div class="drawer-panel">
+        <div class="drawer-head">
+          <h2>资料库</h2>
+          <button class="close" data-close="refs-drawer">×</button>
+        </div>
+        <p class="hint mini">每部剧不同。**定稿后**手动把新术语补进来,翻译/讨论时会自动拼进 system。</p>
+        <ul class="ref-list" id="ref-list"></ul>
+        <label class="file-btn block">
+          <input type="file" id="ref-upload" accept=".txt,.srt" hidden />
+          + 上传 .txt / .srt
+        </label>
+      </div>
+    </div>
+
+    <!-- 抽屉:设置 -->
+    <div class="drawer" id="settings-drawer" hidden>
+      <div class="drawer-mask" data-close="settings-drawer"></div>
+      <div class="drawer-panel">
+        <div class="drawer-head">
+          <h2>设置</h2>
+          <button class="close" data-close="settings-drawer">×</button>
+        </div>
+
+        <h3 class="section-title">API Key</h3>
+        <label class="field">
+          <span>混元 API Key</span>
+          <input type="password" id="hunyuan-key" placeholder="未设置" autocomplete="off" />
+          <small id="hunyuan-status"></small>
+        </label>
+        <label class="field">
+          <span>Qwen API Key</span>
+          <input type="password" id="qwen-key" placeholder="未设置" autocomplete="off" />
+          <small id="qwen-status"></small>
+        </label>
+        <button id="save-keys">保存 Key</button>
+
+        <h3 class="section-title" style="margin-top:24px">系统指令库</h3>
+        <p class="hint mini" style="margin:-4px 0 8px">
+          按场景管理多套指令。点条目左侧圆点把它<b>设为默认</b>，新建对话会自动用上。
+        </p>
+        <ul class="prompt-list" id="prompt-list"></ul>
+        <button id="new-prompt-btn" class="ghost-btn block">+ 新建指令</button>
+
+        <div id="prompt-editor" class="prompt-editor" hidden>
+          <label class="field">
+            <span>名称</span>
+            <input type="text" id="prompt-name" maxlength="60" />
+          </label>
+          <label class="field">
+            <span>内容 (system prompt)</span>
+            <textarea id="prompt-content" rows="8"></textarea>
+          </label>
+          <div class="row-actions">
+            <button id="save-prompt-btn">保存</button>
+            <button id="cancel-prompt-btn" class="ghost-btn">取消</button>
+          </div>
+        </div>
+
+        <h3 class="section-title" style="margin-top:24px">
+          模型管理
+          <small id="model-cap-hint" class="cap-hint"></small>
+        </h3>
+        <p class="hint mini" style="margin:-4px 0 8px">
+          顶部下拉框只显示<b>已启用</b>的模型（上限 10）。Qwen 可自动扫描接口，混元的需手动添加。
+        </p>
+        <div class="model-toolbar">
+          <button id="refresh-qwen-btn" class="ghost-btn">↻ 拉取 Qwen 清单</button>
+          <button id="add-model-btn" class="ghost-btn">+ 新增模型</button>
+        </div>
+
+        <h4 class="subsec-title">已启用 <small id="enabled-count"></small></h4>
+        <ul class="model-list" id="enabled-model-list"></ul>
+
+        <h4 class="subsec-title" style="margin-top:14px">
+          已禁用 <small id="disabled-count"></small>
+          <button id="toggle-disabled-btn" class="ghost-btn micro" type="button">展开</button>
+        </h4>
+        <ul class="model-list" id="disabled-model-list" hidden></ul>
+
+        <div id="model-editor" class="prompt-editor" hidden>
+          <h4 class="subsec-title" id="model-editor-title">新增模型</h4>
+          <label class="field">
+            <span>模型 ID（调用时用的字段）</span>
+            <input type="text" id="model-id" maxlength="80" />
+          </label>
+          <label class="field">
+            <span>显示名</span>
+            <input type="text" id="model-label" maxlength="80" />
+          </label>
+          <label class="field">
+            <span>所属平台</span>
+            <select id="model-provider">
+              <option value="hunyuan">hunyuan（混元）</option>
+              <option value="qwen">qwen（阿里）</option>
+            </select>
+          </label>
+          <div class="cap-row">
+            <label><input type="checkbox" id="model-thinking" /> thinking（推理过程）</label>
+            <label><input type="checkbox" id="model-vision" /> vision（支持图片）</label>
+          </div>
+          <div class="row-actions">
+            <button id="save-model-btn">保存</button>
+            <button id="cancel-model-btn" class="ghost-btn">取消</button>
+          </div>
+        </div>
+
+        <p class="hint mini" style="margin-top:18px">
+          baseURL 已内置。Key 明文存于本地 <code>app/config.json</code>，请勿同步到云盘 / Git。
+        </p>
+      </div>
+    </div>
+
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

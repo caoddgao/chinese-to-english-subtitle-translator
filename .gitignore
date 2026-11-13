@@ -1,0 +1,13 @@
+/app/config.json
+/app/conversations/
+/app/references/
+/app/uploads/
+/python/
+/.claude/
+/.venv/
+.env
+.env.*
+__pycache__/
+*.py[cod]
+*_EN.srt
+/NUL
